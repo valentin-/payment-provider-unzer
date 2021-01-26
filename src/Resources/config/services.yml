@@ -1,0 +1,14 @@
+services:
+    _defaults:
+        public: false
+        autowire: true
+        autoconfigure: true
+
+    Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\Payment\Unzer:
+        arguments:
+            $options: []
+        tags:
+            - { name: pimcore_ecommerce.payment.provider, key: 'unzer' }
+
+    Pimcore\Bundle\EcommerceFrameworkBundle\Unzer\Installer:
+        public: true
