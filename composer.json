@@ -2,6 +2,7 @@
   "name": "pimcore/payment-provider-unzer",
   "license": "GPL-3.0+",
   "type": "pimcore-bundle",
+  "description": "Pimcore Payment Provider - Unzer (Heidelpay)",
   "config": {
     "sort-packages": true
   },
