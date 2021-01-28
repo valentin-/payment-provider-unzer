@@ -77,21 +77,21 @@ Create view template for payment method selection. This view template
         <div id="collapseCC" class="collapse show" aria-labelledby="headingCC" data-parent="#paymentAccordion">
             <div class="card-body">
 
-                <!-- credit card form as from the heidelpay docs -->
-                <form id="cc-form" class="heidelpayUI form" novalidate>
+                <!-- credit card form as from the unzer docs -->
+                <form id="cc-form" class="unzerUI form" novalidate>
                     <div class="field">
-                        <div id="card-element-id-number" class="heidelpayInput">
+                        <div id="card-element-id-number" class="unzerInput">
                             <!-- Card number UI Element will be inserted here. -->
                         </div>
                     </div>
                     <div class="two fields">
                         <div class="field ten wide">
-                            <div id="card-element-id-expiry" class="heidelpayInput">
+                            <div id="card-element-id-expiry" class="unzerInput">
                                 <!-- Card expiry date UI Element will be inserted here. -->
                             </div>
                         </div>
                         <div class="field six wide">
-                            <div id="card-element-id-cvc" class="heidelpayInput">
+                            <div id="card-element-id-cvc" class="unzerInput">
                                 <!-- Card CVC UI Element will be inserted here. -->
                             </div>
                         </div>
@@ -120,7 +120,7 @@ Create view template for payment method selection. This view template
         <div id="collapsePaypal" class="collapse" aria-labelledby="headingPaypal" data-parent="#paymentAccordion">
             <div class="card-body">
 
-                <!-- paypal form as from the heidelpay docs -->
+                <!-- paypal form as from the unzer docs -->
                 <div class="field">
                     <button id="js-redirect-payment-method-paypal" class="btn btn-success btn-block">{{ 'general.paypal.pay' | trans }}</button>
                 </div>
@@ -144,7 +144,7 @@ Create view template for payment method selection. This view template
         <div id="collapseSofort" class="collapse" aria-labelledby="headingSofort" data-parent="#paymentAccordion">
             <div class="card-body">
 
-                <!-- redirect payment content as from the heidelpay docs -->
+                <!-- redirect payment content as from the unzer docs -->
                 <div class="field">
                     <button id="js-redirect-payment-method-paypal-sofort" class="btn btn-success btn-block">{{ 'checkout.sofort.pay' | trans }}</button>
                 </div>
@@ -166,11 +166,11 @@ Create view template for payment method selection. This view template
 ```javascript
 $(document).ready(function() {
 
-    let heidelpayInstance = new heidelpay(_config.accessKey, {locale: 'en-GB'});
+    let unzerInstance = new unzer(_config.accessKey, {locale: 'en-GB'});
 
     let $errorHolder = $('#error-holder');
 
-    let Card = heidelpayInstance.Card();
+    let Card = unzerInstance.Card();
     // Rendering input fields
     Card.create('number', {
         containerId: 'card-element-id-number',
@@ -235,7 +235,7 @@ $(document).ready(function() {
     $('#js-redirect-payment-method-paypal').on('click', function(e){
         e.preventDefault();
 
-        var Paypal = heidelpayInstance.Paypal();
+        var Paypal = unzerInstance.Paypal();
 
         Paypal.createResource()
             .then(successHandler)
@@ -245,7 +245,7 @@ $(document).ready(function() {
     $('#js-redirect-payment-method-paypal-sofort').on('click', function(e){
         e.preventDefault();
 
-        var Sofort = heidelpayInstance.Sofort();
+        var Sofort = unzerInstance.Sofort();
 
         Sofort.createResource()
             .then(successHandler)
