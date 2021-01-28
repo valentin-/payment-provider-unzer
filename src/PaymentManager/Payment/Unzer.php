@@ -15,11 +15,12 @@
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\Payment;
 
 use Carbon\Carbon;
-use heidelpayPHP\Exceptions\HeidelpayApiException;
-use heidelpayPHP\Resources\Customer;
-use heidelpayPHP\Resources\EmbeddedResources\Address;
-use heidelpayPHP\Resources\Payment;
-use heidelpayPHP\Resources\TransactionTypes\Cancellation;
+use Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\V7\Payment\StartPaymentResponse\StartPaymentResponseInterface;
+use UnzerSDK\Exceptions\UnzerApiException;
+use UnzerSDK\Resources\CustomerFactory;
+use UnzerSDK\Resources\EmbeddedResources\Address;
+use UnzerSDK\Resources\Payment;
+use UnzerSDK\Resources\TransactionTypes\Cancellation;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Exception\UnsupportedException;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Factory;
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderAgentInterface;
@@ -30,7 +31,7 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\V7\Payment\StartPayme
 use Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\V7\Payment\StartPaymentResponse\UrlResponse;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\PriceInterface;
 use Pimcore\Localization\LocaleService;
-use Pimcore\Model\DataObject\Objectbrick\Data\PaymentProviderHeidelPay;
+use Pimcore\Model\DataObject\Objectbrick\Data\PaymentProviderUnzer;
 use Pimcore\Model\DataObject\OnlineShopOrder;
 
 class Unzer extends AbstractPayment implements PaymentInterface
@@ -83,7 +84,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
         throw new UnsupportedException('use startPayment instead as initPayment() is deprecated and the order agent is needed by the Unzer payment provider');
     }
 
-    public function startPayment(OrderAgentInterface $orderAgent, PriceInterface $price, AbstractRequest $config): \Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\V7\Payment\StartPaymentResponse\StartPaymentResponseInterface
+    public function startPayment(OrderAgentInterface $orderAgent, PriceInterface $price, AbstractRequest $config): StartPaymentResponseInterface
     {
         if (empty($config['paymentReference'])) {
             throw new \InvalidArgumentException('no paymentReference sent');
@@ -103,7 +104,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
 
         $order = $orderAgent->getOrder();
 
-        $heidelpay = new \heidelpayPHP\Heidelpay($this->privateAccessKey, \Pimcore::getKernel()->getContainer()->get(LocaleService::class)->getLocale());
+        $unzer = new \UnzerSDK\Unzer($this->privateAccessKey, \Pimcore::getKernel()->getContainer()->get(LocaleService::class)->getLocale());
 
         $billingAddress = (new Address())
                           ->setName($order->getCustomerLastname() . ' ' . $order->getCustomerLastname())
@@ -124,7 +125,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
             $shippingAddress = $billingAddress;
         }
 
-        $customer = (new Customer($order->getCustomerFirstname(), $order->getCustomerLastname()))
+        $customer = (CustomerFactory::createCustomer($order->getCustomerFirstname(), $order->getCustomerLastname()))
                     ->setEmail($order->getCustomerEmail())
                     ->setBillingAddress($billingAddress)
                     ->setShippingAddress($shippingAddress);
@@ -139,7 +140,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
 
         $url = null;
         try {
-            $transaction = $heidelpay->charge(
+            $transaction = $unzer->charge(
                 $price->getAmount()->asString(2),
                 $price->getCurrency()->getShortName(),
                 $config['paymentReference'],
@@ -158,12 +159,12 @@ class Unzer extends AbstractPayment implements PaymentInterface
                 null,
                 StatusInterface::STATUS_PENDING,
                 [
-                    'heidelpay_amount' => $transaction->getPayment()->getAmount()->getCharged(),
-                    'heidelpay_currency' => $transaction->getPayment()->getCurrency(),
-                    'heidelpay_paymentType' => $transaction->getPayment()->getPaymentType()->jsonSerialize(),
-                    'heidelpay_paymentReference' => $config['paymentReference'],
-                    'heidelpay_responseStatus' => '',
-                    'heidelpay_response' => $transaction->jsonSerialize(),
+                    'unzer_amount' => $transaction->getPayment()->getAmount()->getCharged(),
+                    'unzer_currency' => $transaction->getPayment()->getCurrency(),
+                    'unzer_paymentType' => $transaction->getPayment()->getPaymentType()->jsonSerialize(),
+                    'unzer_paymentReference' => $config['paymentReference'],
+                    'unzer_responseStatus' => '',
+                    'unzer_response' => $transaction->jsonSerialize(),
                 ]
             );
             $orderAgent->updatePayment($paymentStatus);
@@ -177,7 +178,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
             } else {
                 $url = $config['returnUrl'];
             }
-        } catch (HeidelpayApiException $exception) {
+        } catch (UnzerApiException $exception) {
             $url = $this->generateErrorUrl($config['errorUrl'], $exception->getMerchantMessage(), $exception->getClientMessage());
         } catch (\Exception $exception) {
             $url = $this->generateErrorUrl($config['errorUrl'], $exception->getMessage());
@@ -236,13 +237,13 @@ class Unzer extends AbstractPayment implements PaymentInterface
                     null,
                     StatusInterface::STATUS_AUTHORIZED,
                     [
-                        'heidelpay_amount' => $payment->getAmount()->getCharged(),
-                        'heidelpay_currency' => $payment->getCurrency(),
-                        'heidelpay_paymentType' => $payment->getPaymentType()->jsonSerialize(),
-                        'heidelpay_paymentReference' => $paymentInfo->getPaymentReference(),
-                        'heidelpay_paymentMethod' => get_class($payment->getPaymentType()),
-                        'heidelpay_responseStatus' => 'completed',
-                        'heidelpay_response' => $payment->jsonSerialize(),
+                        'unzer_amount' => $payment->getAmount()->getCharged(),
+                        'unzer_currency' => $payment->getCurrency(),
+                        'unzer_paymentType' => $payment->getPaymentType()->jsonSerialize(),
+                        'unzer_paymentReference' => $paymentInfo->getPaymentReference(),
+                        'unzer_paymentMethod' => get_class($payment->getPaymentType()),
+                        'unzer_responseStatus' => 'completed',
+                        'unzer_response' => $payment->jsonSerialize(),
                     ]
                 );
             } elseif ($payment->isPending()) {
@@ -252,13 +253,13 @@ class Unzer extends AbstractPayment implements PaymentInterface
                     null,
                     StatusInterface::STATUS_PENDING,
                     [
-                        'heidelpay_amount' => $payment->getAmount()->getCharged(),
-                        'heidelpay_currency' => $payment->getCurrency(),
-                        'heidelpay_paymentType' => $payment->getPaymentType()->jsonSerialize(),
-                        'heidelpay_paymentReference' => $paymentInfo->getPaymentReference(),
-                        'heidelpay_paymentMethod' => get_class($payment->getPaymentType()),
-                        'heidelpay_responseStatus' => 'pending',
-                        'heidelpay_response' => $payment->jsonSerialize(),
+                        'unzer_amount' => $payment->getAmount()->getCharged(),
+                        'unzer_currency' => $payment->getCurrency(),
+                        'unzer_paymentType' => $payment->getPaymentType()->jsonSerialize(),
+                        'unzer_paymentReference' => $paymentInfo->getPaymentReference(),
+                        'unzer_paymentMethod' => get_class($payment->getPaymentType()),
+                        'unzer_responseStatus' => 'pending',
+                        'unzer_response' => $payment->jsonSerialize(),
                     ]
                 );
             }
@@ -266,7 +267,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
             // Check the result message of the transaction to find out what went wrong.
             $transaction = $payment->getChargeByIndex(0);
             $merchantMessage = $transaction->getMessage()->getCustomer();
-        } catch (HeidelpayApiException $e) {
+        } catch (UnzerApiException $e) {
             $clientMessage = $e->getClientMessage();
             $merchantMessage = $e->getMerchantMessage();
         } catch (\Throwable $e) {
@@ -289,15 +290,15 @@ class Unzer extends AbstractPayment implements PaymentInterface
             null,
             StatusInterface::STATUS_CANCELLED,
             [
-                'heidelpay_amount' => $payment ? $payment->getAmount()->getCharged() : '',
-                'heidelpay_currency' => $payment ? $payment->getCurrency() : '',
-                'heidelpay_paymentType' => $payment ? $payment->getPaymentType()->jsonSerialize() : '',
-                'heidelpay_paymentReference' => $paymentInfo ? $paymentInfo->getPaymentReference() : '',
-                'heidelpay_paymentMethod' => $payment ? get_class($payment->getPaymentType()) : '',
-                'heidelpay_clientMessage' => $clientMessage,
-                'heidelpay_merchantMessage' => $merchantMessage,
-                'heidelpay_responseStatus' => 'error',
-                'heidelpay_response' => $payment->jsonSerialize(),
+                'unzer_amount' => $payment ? $payment->getAmount()->getCharged() : '',
+                'unzer_currency' => $payment ? $payment->getCurrency() : '',
+                'unzer_paymentType' => $payment ? $payment->getPaymentType()->jsonSerialize() : '',
+                'unzer_paymentReference' => $paymentInfo ? $paymentInfo->getPaymentReference() : '',
+                'unzer_paymentMethod' => $payment ? get_class($payment->getPaymentType()) : '',
+                'unzer_clientMessage' => $clientMessage,
+                'unzer_merchantMessage' => $merchantMessage,
+                'unzer_responseStatus' => 'error',
+                'unzer_response' => $payment->jsonSerialize(),
             ]
         );
     }
@@ -334,15 +335,15 @@ class Unzer extends AbstractPayment implements PaymentInterface
      *
      * @return bool
      *
-     * @throws HeidelpayApiException
+     * @throws UnzerApiException
      */
     public function cancelCharge(OnlineShopOrder $order, PriceInterface $price)
     {
-        $heidelpay = new \heidelpayPHP\Heidelpay($this->privateAccessKey);
-        $heidelpayBrick = $order->getPaymentProvider()->getPaymentProviderHeidelPay();
+        $unzer = new \UnzerSDK\Unzer($this->privateAccessKey);
+        $unzerBrick = $order->getPaymentProvider()->getPaymentProviderUnzer();
 
-        if ($heidelpayBrick instanceof PaymentProviderHeidelPay) {
-            $result = $heidelpay->cancelChargeById($heidelpayBrick->getAuth_paymentReference(), $heidelpayBrick->getAuth_chargeId(), $price->getAmount()->asNumeric());
+        if ($unzerBrick instanceof PaymentProviderUnzer) {
+            $result = $unzer->cancelChargeById($unzerBrick->getAuth_paymentReference(), $unzerBrick->getAuth_chargeId(), $price->getAmount()->asNumeric());
 
             return $result->isSuccess();
         }
@@ -355,15 +356,15 @@ class Unzer extends AbstractPayment implements PaymentInterface
      *
      * @return float
      *
-     * @throws HeidelpayApiException
+     * @throws UnzerApiException
      */
     public function getMaxCancelAmount(OnlineShopOrder $order)
     {
-        $heidelpay = new \heidelpayPHP\Heidelpay($this->privateAccessKey);
-        $heidelpayBrick = $order->getPaymentProvider()->getPaymentProviderHeidelPay();
+        $unzer = new \UnzerSDK\Unzer($this->privateAccessKey);
+        $unzerBrick = $order->getPaymentProvider()->getPaymentProviderUnzer();
 
-        if ($heidelpayBrick instanceof PaymentProviderHeidelPay) {
-            $charge = $heidelpay->fetchChargeById($heidelpayBrick->getAuth_paymentReference(), $heidelpayBrick->getAuth_chargeId());
+        if ($unzerBrick instanceof PaymentProviderUnzer) {
+            $charge = $unzer->fetchChargeById($unzerBrick->getAuth_paymentReference(), $unzerBrick->getAuth_chargeId());
             $totalAmount = $charge->getAmount();
 
             /**
@@ -384,7 +385,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
      *
      * @return Payment
      *
-     * @throws HeidelpayApiException
+     * @throws UnzerApiException
      */
     public function fetchPayment(OnlineShopOrder $order): ?Payment
     {
@@ -399,9 +400,9 @@ class Unzer extends AbstractPayment implements PaymentInterface
             return null;
         }
 
-        $heidelpay = new \heidelpayPHP\Heidelpay($this->privateAccessKey);
+        $unzer = new \UnzerSDK\Unzer($this->privateAccessKey);
 
-        return $heidelpay->fetchPayment($paymentInfo->getPaymentReference());
+        return $unzer->fetchPayment($paymentInfo->getPaymentReference());
     }
 }
 

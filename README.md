@@ -1,19 +1,19 @@
-# Unzer(former: Heidelpay)
+# Pimcore E-Commerce Framework Payment Provider - Unzer(former: Heidelpay)
 
 ## Unzer Web Integration
 
-To integrate Unzer web integration see [Unzer docs](https://docs.heidelpay.com/docs/web-integration) 
+To integrate Unzer web integration see [Unzer docs](https://docs.unzer.com/integrate/web-integration) 
 and follow following steps. 
 
 The basic flow goes as following: 
-- Heidelpay gets initialized via java script and depending on activated payment methods additional 
+- Unzer gets initialized via java script and depending on activated payment methods additional 
   form fields are injected to view template.   
 - User selects payment method and enters additional information if necessary (e.g. credit card information).
-- Information is submitted to heidelpay, payment transaction is started and payment id is returned. 
+- Information is submitted to unzer, payment transaction is started and payment id is returned. 
 - Payment id is submitted back to Pimcore and Pimcore payment transaction is started. 
 - If necessary user is redirected to payment provider (e.g. Paypal).
 - If user comes back from external payment site, payment state is checked server-to-server between Pimcore and
-  heidelpay and if successful order is committed and user is redirected to success page. 
+  unzer and if successful order is committed and user is redirected to success page. 
 
 
 ## Installation
@@ -276,7 +276,7 @@ public function checkoutPaymentAction(Factory $factory) {
     $paymentProvider = $checkoutManager->getPayment();
 
     $accessKey = '';
-    if($paymentProvider instanceof Heidelpay) {
+    if($paymentProvider instanceof Unzer) {
         $accessKey = $paymentProvider->getPublicAccessKey();
     }
 
@@ -290,10 +290,10 @@ public function checkoutPaymentAction(Factory $factory) {
 
 6) **Create Controller Action for Starting Payment**
 
-To this action the paymentId of heidelpay is submitted after payment transaction is started 
+To this action the paymentId of Unzer is submitted after payment transaction is started 
 successfully on client side. 
 
-Additionally an error action is defined to extract the error messages from heidelpay. 
+Additionally an error action is defined to extract the error messages from Unzer. 
 
 ```php
 /**
@@ -316,7 +316,7 @@ public function startPaymentAction(Request $request, Factory $factory, LoggerInt
         /** @var OnlineShopOrder $order */
         $order = $paymentInfo->getObject();
 
-        $paymentConfig = new HeidelpayRequest();
+        $paymentConfig = new UnzerRequest();
         $paymentConfig->setInternalPaymentId($paymentInfo->getInternalPaymentId());
         $paymentConfig->setPaymentReference($request->get('paymentId'));
         $paymentConfig->setReturnUrl($this->generateUrl('shop-commit-order', ['order' => $order->getOrdernumber()], UrlGeneratorInterface::ABSOLUTE_URL));
@@ -403,5 +403,5 @@ public function commitOrderAction(Request $request, Factory $factory, LoggerInte
 ```
 
 ## Important Configuration
-Please make sure that `serialize_precision` is set to a very high value, or even better to `-1` in order to prevent rounding issues with the heidelpay php sdk. 
-For details also see https://docs.heidelpay.com/docs/installation#php-configuration
+Please make sure that `serialize_precision` is set to a very high value, or even better to `-1` in order to prevent rounding issues with the unzer sdk. 
+For details also see https://docs.unzer.com/integrate/php-sdk/installation/#php-configuration
