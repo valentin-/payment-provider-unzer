@@ -1,213 +1,407 @@
-# Pimcore E-Commerce Framework Payment Provider - Hobex
+# Unzer(former: Heidelpay)
 
-## Official Hobex Documentation
-* [Getting Started](https://hobex.docs.oppwa.com/)
-* [COPYandPAY Integration Guide](https://hobex.docs.oppwa.com/tutorials/integration-guide)
-* [API Reference](https://hobex.docs.oppwa.com/reference/parameters) 
+## Unzer Web Integration
 
-## Requirements
-Hobex does not require an additional PHP-SDK. You just need to get a test account from your integration partner.
+To integrate Unzer web integration see [Unzer docs](https://docs.heidelpay.com/docs/web-integration) 
+and follow following steps. 
 
+The basic flow goes as following: 
+- Heidelpay gets initialized via java script and depending on activated payment methods additional 
+  form fields are injected to view template.   
+- User selects payment method and enters additional information if necessary (e.g. credit card information).
+- Information is submitted to heidelpay, payment transaction is started and payment id is returned. 
+- Payment id is submitted back to Pimcore and Pimcore payment transaction is started. 
+- If necessary user is redirected to payment provider (e.g. Paypal).
+- If user comes back from external payment site, payment state is checked server-to-server between Pimcore and
+  heidelpay and if successful order is committed and user is redirected to success page. 
+
+
+## Installation
+
+Install latest version with composer:
+```bash 
+composer require pimcore/payment-provider-unzer
+```
+
+Enable bundle via console or extensions manager in Pimcore backend:
+```bash
+php bin/console pimcore:bundle:enable PimcorePaymentProviderUnzerBundle
+php bin/console pimcore:bundle:install PimcorePaymentProviderUnzerBundle
+```
 
 ## Configuration
+Setup payment provider in e-commerce framework configuration. The access keys you find
+in Unzer documentation (or you will get them from Unzer for production integrations). 
 
-```yaml
-pimcore_ecommerce_framework:
-    
-    # ...
-    
-    # add hobex to the set of active payment providers
-    payment_manager:
-        providers:
-            hobex_testprovider:
-                provider_id: Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\Payment\Hobex                    
-                profile: sandbox
-                profiles:
-                    sandbox:
-                        entityId: '8a829418530df1d201531299e097175c'
-                        authorizationBearer: 'OGE4Mjk0MTg1MzBkZjFkMjAxNTMxMjk5ZTJjMTE3YWF8ZzJnU3BnS2hLUw=='
-                        testSystem: true
-                        payment_methods:
-                            - VISA
-                            - MASTER
-                            - SOFORTUEBERWEISUNG
-                            - SEPA
-    
-    # ...
-    # configure the payment provider in the checkout manager
-    checkout_manager:
-        tenants:
-            _defaults:
-                payment:
-                    provider: hobex_testprovider
-            default: ~                              
-```
-
-Hobex is compatible with Pimcore 10, so for Pimcore 6 you may have to add the following line to your config.yml:
 ```yml
-    - { resource: '@PimcoreEcommerceFrameworkBundle/Resources/config/v7_configurations.yml' }
-```
+unzer:
+    provider_id: Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\Payment\Unzer
+    profile: sandbox
+    profiles:
+        sandbox:
+            publicAccessKey: s-pub-2a10gsZJ2IeiiK80Wh68qrOzu4IZse6k
+            privateAccessKey: s-priv-2a10BF2Cq2YvAo6ALSGHc3X7F42oWAIp
+```      
 
+**Create View Template**
 
-## Implementation
+Create view template for payment method selection. This view template  
+- needs to include a javascript and a css from Unzer. 
+- has a list of all provided payment methods and depending of the payment method additional form elements. 
+- includes a java script that handles data communication the data to Unzer. 
+- has an additional form that submits successful payment information (Unzer payment id) back to Pimcore.  
 
-CheckoutController.php
-```php
-  /**
-     * Payment step of the checkout.
-     * This is where the payment widget is initialized and displayed.
-     * @Route("/checkout/payment")
-     * @param Request $request
-     */
-    public function payment(Request $request, Factory $factory) {
-        $cartManager = $factory->getCartManager();
-        $orderManager = $factory->getOrderManager();
+**Sample template with Creditcard, Paypal and Sofort** 
 
-        $cart = $cartManager->getCartByName('cart');
-        $checkoutManager = Factory::getInstance()->getCheckoutManager($cart);
-
-        $order = $orderManager->getOrCreateOrderFromCart($cart);       
-
-        $requestConfig = new HobexRequest();
-        $requestConfig
-            ->setShopperResultUrl($this->generateUrl('app_webshop_payment_result'))
-            ->setLocale('de')
-        ;
-        
-        /** @var SnippetResponse $paymentInitResponse */
-        $paymentInitResponse = $checkoutManager->startOrderPaymentWithPaymentProvider($requestConfig);
-
-        return $this->renderTemplate('Webshop/Checkout/payment.html.twig', [
-            'cart' => $cart,
-            'order' => $order,
-            'renderedForm' => $paymentInitResponse->getSnippet()
-        ]);
-    }
-    
-    /**
-     * Final step of the example payment checkout.
-     * This is called then the payment succeeded and the order got confirmed.
-     * @Route("/checkout/success")
-     * @param Request $request
-     */
-    public function success(Request $request) {
-        // needs some implementation. Typically a success page is rendered.
-    }
-```
-
-app/Resources/views/Webshop/Checkout/payment.html.twig:
 ```twig
-{% extends ':Layout:default.html.twig' %}
-{% block content %}
-    <div class="container" style="margin-top:2em">
-        <div class="row">
-            <div class="col-md-12">
-                <h1>💰 Example Checkout / Payment</h1>
-               
-                <hr/>
-                <h5>Order:</h5>
-                <ul>
-                    <li>ID: {{ order.id }}</li>
-                    <li>Number: {{ order.ordernumber }}</li>
-                </ul>
+{% do pimcore_head_link().appendStylesheet('https://static.unzer.com/v1/unzer.css') %}
+{% do pimcore_head_script().appendFile('https://static.unzer.com/v1/unzer.js') %}
+{% do pimcore_inline_script().appendFile(asset('static/js/payment.js')) %} {# custom payment js, see below #}
 
-                <hr/>
-                
-                {{ #payment widget: }}
-                {{ renderedForm | raw }}
+<h4 class="mb-3">{{ 'checkout.payment' | trans }}</h4>
 
-                <hr/>
+<div class="accordion" id="paymentAccordion">
+    <div class="card">
+        <div class="card-header" id="headingCC">
+            <div class="display-4 mb-0">
+                <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapseCC" aria-expanded="true" aria-controls="collapseCC">
+                    {{ 'checkout.creditcard' | trans }}
+                </button>
+                <div class="float-right mr-4">
+                    <img style="width: 40px" src="{{ asset('static/images/mc_vrt_pos.svg') }}" />
+                    <img style="width: 40px" src="{{ asset('static/images/visa_inc_logo.svg') }}" />
+                </div>
+            </div>
+        </div>
 
-                <a class="btn btn-info" href="{{ path('app_webshop_cart_list') }}">⏎ Back To Cart</a>
+        <div id="collapseCC" class="collapse show" aria-labelledby="headingCC" data-parent="#paymentAccordion">
+            <div class="card-body">
+
+                <!-- credit card form as from the heidelpay docs -->
+                <form id="cc-form" class="heidelpayUI form" novalidate>
+                    <div class="field">
+                        <div id="card-element-id-number" class="heidelpayInput">
+                            <!-- Card number UI Element will be inserted here. -->
+                        </div>
+                    </div>
+                    <div class="two fields">
+                        <div class="field ten wide">
+                            <div id="card-element-id-expiry" class="heidelpayInput">
+                                <!-- Card expiry date UI Element will be inserted here. -->
+                            </div>
+                        </div>
+                        <div class="field six wide">
+                            <div id="card-element-id-cvc" class="heidelpayInput">
+                                <!-- Card CVC UI Element will be inserted here. -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field" id="error-holder" style="color: #9f3a38"> </div>
+                    <div class="field">
+                        <button id="submit-button" class="btn btn-success btn-block" type="submit">{{ 'general.creditcard.pay' | trans }}</button>
+                    </div>
+                </form>
+
 
             </div>
         </div>
     </div>
-{% endblock %}
+    <div class="card">
+        <div class="card-header" id="headingPaypal">
+            <div class="display-4 mb-0">
+                <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapsePaypal" aria-expanded="true" aria-controls="collapsePaypal">
+                    {{ 'checkout.paypal' | trans }}
+                </button>
+                <div class="float-right mr-4">
+                    <img style="width: 40px" src="{{ asset('static/images/PayPal_logo.svg') }}" />
+                </div>
+            </div>
+        </div>
+        <div id="collapsePaypal" class="collapse" aria-labelledby="headingPaypal" data-parent="#paymentAccordion">
+            <div class="card-body">
+
+                <!-- paypal form as from the heidelpay docs -->
+                <div class="field">
+                    <button id="js-redirect-payment-method-paypal" class="btn btn-success btn-block">{{ 'general.paypal.pay' | trans }}</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header" id="headingSofort">
+            <div class="display-4 mb-0">
+                <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapseSofort" aria-expanded="true" aria-controls="collapseSofort">
+
+                    {{ 'checkout.sofort' | trans }}
+
+                </button>
+                <div class="float-right mr-4">
+                    <img style="width: 40px" src="{{ asset('static/images/SOFORT_ÜBERWEISUNG_Logo.svg') }}" />
+                </div>
+            </div>
+        </div>
+        <div id="collapseSofort" class="collapse" aria-labelledby="headingSofort" data-parent="#paymentAccordion">
+            <div class="card-body">
+
+                <!-- redirect payment content as from the heidelpay docs -->
+                <div class="field">
+                    <button id="js-redirect-payment-method-paypal-sofort" class="btn btn-success btn-block">{{ 'checkout.sofort.pay' | trans }}</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Form to submit successful payment result to Pimcore -->
+<form id="js-submit-payment-result" action="{{ path('shop-checkout-start-payment') }}">
+    <input type="hidden" name="paymentMethod" class="js-payment-method-hidden" value=""/>
+    <input type="hidden" name="paymentId" class="js-payment-id-hidden" value=""/>
+</form>
 ```
 
-PaymentController:
-```php
-    /**
-     * In the payment controller the response from Hobex payments is handled.
-     * This action is typically called when the payment succeeded. 
-     * @Route("/checkout/payment/result")
-     * @param Request $request
-     */
-    public function result(Request $request, Factory $factory) {
+**Sample Javascript (payment.js) with Creditcard, Paypal and Sofort**
 
-        $cartManager = $factory->getCartManager();
-        $orderManager = $factory->getOrderManager();
+```javascript
+$(document).ready(function() {
 
-        $paymentProvider = Factory::getInstance()->getPaymentManager()->getProvider("hobex_testprovider");
+    let heidelpayInstance = new heidelpay(_config.accessKey, {locale: 'en-GB'});
 
-        $order = Factory::getInstance()->getCommitOrderProcessor()->handlePaymentResponseAndCommitOrderPayment(
-            $request->query->all(),
-            $paymentProvider
-        );
+    let $errorHolder = $('#error-holder');
 
-        if ($order->getOrderState() == AbstractOrder::ORDER_STATE_COMMITTED) {
-            return $this->redirectToRoute('app_webshop_checkout_success');
-        } else {           
-            $errorMessage = 'Something wrent wrong with the payment: '.$order->getLastPaymentInfo()->getMessage());
-            // error handling ...
-            return $this->redirectToRoute('app_webshop_checkout_step1');
+    let Card = heidelpayInstance.Card();
+    // Rendering input fields
+    Card.create('number', {
+        containerId: 'card-element-id-number',
+        onlyIframe: false
+    });
+    Card.create('expiry', {
+        containerId: 'card-element-id-expiry',
+        onlyIframe: false
+    });
+    Card.create('cvc', {
+        containerId: 'card-element-id-cvc',
+        onlyIframe: false
+    });
+
+    let ccForm = document.getElementById('cc-form');
+    let submitPaymentResultForm = document.getElementById('js-submit-payment-result');
+
+    // General event handling
+    let buttonDisabled = {};
+    let submitButton = document.getElementById('submit-button');
+    submitButton.disabled = true;
+
+
+    let successHandler = function(data) {
+        console.log('success');
+        data.method = data.method ? data.method : 'card';
+        $('.js-payment-method-hidden').val(data.method);
+        $('.js-payment-id-hidden').val(data.id);
+
+        submitPaymentResultForm.submit();
+    };
+
+    let errorHandler = function(error) {
+        console.log('error');
+        $errorHolder.html(error.message);
+    };
+
+    Card.addEventListener('change', function(e) {
+        if (e.success) {
+            buttonDisabled[e.type] = true;
+            submitButton.disabled = false;
+            $errorHolder.html('')
+        } else {
+            buttonDisabled[e.type] = false;
+            submitButton.disabled = true;
+            $errorHolder.html(e.error)
         }
+        submitButton.disabled = !(buttonDisabled.number && buttonDisabled.expiry && buttonDisabled.cvc);
 
-    }
+    });
+
+
+    ccForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        console.log('creditcard form submit');
+        Card.createResource()
+            .then(successHandler)
+            .catch(errorHandler)
+    });
+
+
+    $('#js-redirect-payment-method-paypal').on('click', function(e){
+        e.preventDefault();
+
+        var Paypal = heidelpayInstance.Paypal();
+
+        Paypal.createResource()
+            .then(successHandler)
+            .catch(errorHandler)
+    });
+
+    $('#js-redirect-payment-method-paypal-sofort').on('click', function(e){
+        e.preventDefault();
+
+        var Sofort = heidelpayInstance.Sofort();
+
+        Sofort.createResource()
+            .then(successHandler)
+            .catch(errorHandler)
+    });
+
+
+});
 ```
 
-## Implementation
-see https://hobex.docs.oppwa.com/tutorials/webhooks/configuration
+5) **Create Controller Action for Payment Selection**
 
-If you want to use webhooks, you have to configure the webhook secret: 
+The only special thing in this controller action is to get public access key out of
+payment provider and assign it to the template. 
 
-```yaml
-pimcore_ecommerce_framework:
-    
-    # ...
-    
-    # add hobex to the set of active payment providers
-    payment_manager:
-        providers:
-            hobex_testprovider:
-                provider_id: Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\Payment\Hobex                    
-                profile: sandbox
-                profiles:
-                    sandbox:
-                        entityId: '8a829418530df1d201531299e097175c'
-                        authorizationBearer: 'OGE4Mjk0MTg1MzBkZjFkMjAxNTMxMjk5ZTJjMTE3YWF8ZzJnU3BnS2hLUw=='
-                        # optional: if you configured webhook, you need to configure the secret here  
-                        webhookSecret: '353FADF1340CA4AFA7052AD8BAAEA788E177C9D9CFC8271294F53CA83F4DB4AD' 
-                        testSystem: true
-                        payment_methods:
-                            - VISA
-                            - MASTER
-                            - SOFORTUEBERWEISUNG
-                            - SEPA
-    
-                              
-```
-
-Example of controller/Action to handle the webhook response: 
-
-
-PaymentController:
 ```php
-    /**
-     * In the payment controller the webhook response from Hobex payments is handled.
-     * @Route("/checkout/payment/webhook")
-     * @param Request $request
-     */
-    public function webhookAction(Request $request){
-        $paymentProvider = Factory::getInstance()->getPaymentManager()->getProvider("hobex_testprovider");
-        $order = Factory::getInstance()->getCommitOrderProcessor()->handlePaymentResponseAndCommitOrderPayment(
-                ['base64Content' => $request->getContent(), 'authTag' => $request->headers->get('x-authentication-tag'),
-                 'initVector' => $request->headers->get('x-initialization-vector')],
-                $paymentProvider
-            );
-        return new Response('ok',200);
+/**
+ * @Route("/checkout-payment", name="shop-checkout-payment")
+ *
+ * @param Factory $factory
+ * @return array
+ */
+public function checkoutPaymentAction(Factory $factory) {
+    $cartManager = $factory->getCartManager();
 
+    $cart = $cartManager->getOrCreateCartByName('cart');
+    $checkoutManager = $factory->getCheckoutManager($cart);
+    $paymentProvider = $checkoutManager->getPayment();
+
+    $accessKey = '';
+    if($paymentProvider instanceof Heidelpay) {
+        $accessKey = $paymentProvider->getPublicAccessKey();
     }
 
+    return [
+        'cart' => $cart,
+        'accessKey' => $accessKey
+    ];
+}
 ```
+
+
+6) **Create Controller Action for Starting Payment**
+
+To this action the paymentId of heidelpay is submitted after payment transaction is started 
+successfully on client side. 
+
+Additionally an error action is defined to extract the error messages from heidelpay. 
+
+```php
+/**
+ * @Route("/checkout-start-payment", name="shop-checkout-start-payment")
+ *
+ * @param Request $request
+ * @param Factory $factory
+ * @return RedirectResponse
+ */
+public function startPaymentAction(Request $request, Factory $factory, LoggerInterface $logger) {
+    try {
+        $cartManager = $factory->getCartManager();
+        $cart = $cartManager->getOrCreateCartByName('cart');
+
+        /** @var CheckoutManagerInterface $checkoutManager */
+        $checkoutManager = $factory->getCheckoutManager($cart);
+
+        $paymentInfo = $checkoutManager->initOrderPayment();
+
+        /** @var OnlineShopOrder $order */
+        $order = $paymentInfo->getObject();
+
+        $paymentConfig = new HeidelpayRequest();
+        $paymentConfig->setInternalPaymentId($paymentInfo->getInternalPaymentId());
+        $paymentConfig->setPaymentReference($request->get('paymentId'));
+        $paymentConfig->setReturnUrl($this->generateUrl('shop-commit-order', ['order' => $order->getOrdernumber()], UrlGeneratorInterface::ABSOLUTE_URL));
+        $paymentConfig->setErrorUrl($this->generateUrl('shop-checkout-payment-error', [], UrlGeneratorInterface::ABSOLUTE_URL));
+
+        $response = $checkoutManager->startOrderPaymentWithPaymentProvider($paymentConfig);
+
+        if($response instanceof UrlResponse) {
+            return new RedirectResponse($response->getUrl());
+        }
+    } catch (\Exception $e) {
+        $this->addFlash('danger', $e->getMessage());
+        $logger->error($e->getMessage());
+        return $this->redirectToRoute('shop-checkout-payment');
+    }
+
+}
+
+/**
+ * @Route("/payment-error", name = "shop-checkout-payment-error" )
+ */
+public function paymentErrorAction(Request $request, LoggerInterface $logger)
+{
+    $logger->error('payment error: ' . $request->get('merchantMessage'));
+
+    if($clientMessage = $request->get('clientMessage')) {
+        $this->addFlash('danger', $clientMessage);
+    }
+
+    return $this->redirectToRoute('shop-checkout-payment');
+}
+```
+
+
+7) **Create Controller Action for Commit Order**
+Finally commit order and redirect user to order success page. 
+
+```php
+/**
+ * @Route("/payment-commit-order", name="shop-commit-order")
+ *
+ * @param Request $request
+ * @param Factory $factory
+ * @param LoggerInterface $logger
+ * @param Translator $translator
+ * @param SessionInterface $session
+ * @return RedirectResponse
+ * @throws \Pimcore\Bundle\EcommerceFrameworkBundle\Exception\UnsupportedException
+ */
+public function commitOrderAction(Request $request, Factory $factory, LoggerInterface $logger, Translator $translator, SessionInterface $session) {
+    $order = OnlineShopOrder::getByOrdernumber($request->query->get('order'), 1);
+
+    $cartManager = $factory->getCartManager();
+    $cart = $cartManager->getOrCreateCartByName('cart');
+
+    /**
+     * @var CheckoutManagerInterface $checkoutManager
+     */
+    $checkoutManager = $factory->getCheckoutManager($cart);
+
+    try {
+        $order = $checkoutManager->handlePaymentResponseAndCommitOrderPayment([
+            'order' => $order
+        ]);
+
+    } catch(\Exception $e) {
+        $logger->error($e->getMessage());
+    }
+
+    if(!$order || $order->getOrderState() !== AbstractOrder::ORDER_STATE_COMMITTED) {
+
+        $this->addFlash('danger', $translator->trans('checkout.payment-failed'));
+        return $this->redirectToRoute('shop-checkout-payment');
+    }
+
+    if (!$session->isStarted()) {
+        $session->start();
+    }
+
+    $session->set("last_order_id", $order->getId());
+
+    return $this->redirectToRoute('shop-checkout-completed');
+}
+```
+
+## Important Configuration
+Please make sure that `serialize_precision` is set to a very high value, or even better to `-1` in order to prevent rounding issues with the heidelpay php sdk. 
+For details also see https://docs.heidelpay.com/docs/installation#php-configuration
