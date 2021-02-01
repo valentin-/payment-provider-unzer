@@ -18,8 +18,6 @@ class Installer extends PaymentProviderInstaller
     protected $bricksPath = __DIR__ . '/../../install/objectbrick_sources/';
 
     protected $bricksToInstall = [
-        'PaymentProviderUnzer' => 'objectbrick_PaymentProviderUnzer_export.json',
-        //for BC reasons
-        'PaymentProviderHeidelPay' => 'objectbrick_PaymentProviderUnzer_export.json'
+        'PaymentProviderUnzer' => 'objectbrick_PaymentProviderUnzer_export.json'
     ];
 }
