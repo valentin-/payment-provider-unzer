@@ -43,6 +43,12 @@ unzer:
             privateAccessKey: s-priv-2a10BF2Cq2YvAo6ALSGHc3X7F42oWAIp
 ```      
 
+Payment Information: Order payment section "Payment Informations" stores information about every payment trial by Customer.
+
+Add additional fields in "PaymentInfo" fieldcollection, so that Order Manager stores information in Order object:
+![PaymentInfo Additional Data](./doc/img/unzer_paymentinfo.png)
+
+
 **Create View Template**
 
 Create view template for payment method selection. This view template  
