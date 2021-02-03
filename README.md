@@ -1,4 +1,4 @@
-# Pimcore E-Commerce Framework Payment Provider - Unzer(former: Heidelpay)
+# Pimcore E-Commerce Framework Payment Provider - Unzer (former: Heidelpay)
 
 ## Unzer Web Integration
 
