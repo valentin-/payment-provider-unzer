@@ -7,7 +7,7 @@
     "sort-packages": true
   },
   "require": {
-    "unzerdev/php-sdk": "^1.1.0.0",
+    "brusch/unzer-php-sdk": "^1.1.1.1",
     "pimcore/pimcore": "^10.0.0"
   },
   "autoload": {
