@@ -142,7 +142,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
         $url = null;
         try {
             $transaction = $unzer->charge(
-                $price->getAmount()->asString(2),
+                (float) $price->getAmount()->asString(2),
                 $price->getCurrency()->getShortName(),
                 $config['paymentReference'],
                 $config['returnUrl'],
@@ -235,7 +235,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
                 return new Status(
                     $paymentInfo->getInternalPaymentId(),
                     $payment->getId(),
-                    null,
+                    '',
                     StatusInterface::STATUS_AUTHORIZED,
                     [
                         'unzer_amount' => $payment->getAmount()->getCharged(),
@@ -251,7 +251,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
                 return new Status(
                     $paymentInfo->getInternalPaymentId(),
                     $payment->getId(),
-                    null,
+                    '',
                     StatusInterface::STATUS_PENDING,
                     [
                         'unzer_amount' => $payment->getAmount()->getCharged(),
@@ -288,7 +288,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
         return new Status(
             $paymentInfo ? $paymentInfo->getInternalPaymentId() : '',
             $payment ? $payment->getId() : '',
-            null,
+            '',
             StatusInterface::STATUS_CANCELLED,
             [
                 'unzer_amount' => $payment ? $payment->getAmount()->getCharged() : '',
