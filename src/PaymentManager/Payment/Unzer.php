@@ -157,7 +157,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
             $paymentStatus = new Status(
                 $config['internalPaymentId'],
                 $transaction->getPaymentId(),
-                null,
+                '',
                 StatusInterface::STATUS_PENDING,
                 [
                     'unzer_amount' => $transaction->getPayment()->getAmount()->getCharged(),
