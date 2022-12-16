@@ -384,7 +384,7 @@ class Unzer extends AbstractPayment implements PaymentInterface
     /**
      * @param OnlineShopOrder $order
      *
-     * @return Payment
+     * @return ?Payment
      *
      * @throws UnzerApiException
      */

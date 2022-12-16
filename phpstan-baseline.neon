@@ -1,2 +1,14 @@
 parameters:
 	ignoreErrors:
+		-
+			message: "#^Call to method [a-zA-Z_]+\\(\\) on an unknown class Pimcore\\\\Model\\\\[a-zA-Z\\\\]+\\.$#"
+			count: 6
+			path: src/PaymentManager/Payment/Unzer.php
+		-
+			message: "#^Class Pimcore\\\\Model\\\\DataObject[a-zA-Z\\\\]+ not found\\.$#"
+			count: 3
+			path: src/PaymentManager/Payment/Unzer.php
+		-
+			message: "#^Parameter \\$[a-zA-Z]+ of method Pimcore\\\\Bundle\\\\EcommerceFrameworkBundle\\\\[a-zA-Z\\\\]+\\:\\:[a-zA-Z]+\\(\\) has invalid type Pimcore\\\\Model\\\\[a-zA-Z\\\\]+\\.$#"
+			count: 6
+			path: src/PaymentManager/Payment/Unzer.php
