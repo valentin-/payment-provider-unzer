@@ -12,3 +12,11 @@ parameters:
 			message: "#^Parameter \\$[a-zA-Z]+ of method Pimcore\\\\Bundle\\\\EcommerceFrameworkBundle\\\\[a-zA-Z\\\\]+\\:\\:[a-zA-Z]+\\(\\) has invalid type Pimcore\\\\Model\\\\[a-zA-Z\\\\]+\\.$#"
 			count: 6
 			path: src/PaymentManager/Payment/Unzer.php
+		-
+			message: "#^Parameter \\#1 \\$order of method Pimcore\\\\Bundle\\\\EcommerceFrameworkBundle\\\\OrderManager\\\\V7\\\\OrderManagerInterface\\:\\:createOrderAgent\\(\\) expects Pimcore\\\\Bundle\\\\EcommerceFrameworkBundle\\\\Model\\\\AbstractOrder\\, Pimcore\\\\Model\\\\DataObject\\\\OnlineShopOrder given\\.$#"
+			count: 2
+			path: src/PaymentManager/Payment/Unzer.php
+		-
+			message: "#^Call to an undefined method UnzerSDK\\\\Resources\\\\AbstractUnzerResource\\:\\:getMessage\\(\\)\\.$#"
+			count: 1
+			path: src/PaymentManager/Payment/Unzer.php
